@@ -17,34 +17,43 @@ const App = () => {
   ]);
 
   const generateBotResponse = async (history) => {
-    const updateHistory = (text, isError = false) => {
+    const updateHistory = (text, isError = false, image = null) => {
       setChatHistory((prev) => [
         ...prev.filter((msg) => msg.text !== "Pensando..."),
-        { role: "model", text, isError },
+        { role: "model", text, isError, image },
       ]);
     };
 
-    const formattedHistory = history.map(({ role, text }) => ({ role, parts: [{ text }] }));
+    const lastMessage = history[history.length - 1].text;
 
     try {
-      // Mostrar mensaje de "Pensando..." mientras llega la respuesta
+      // Mostrar mensaje de "Pensando..."
       setChatHistory((prev) => [...prev, { role: "model", text: "Pensando..." }]);
 
-      // Llamada a la API con Axios
+      // Llamada a la API de tortas
       const { data } = await axios.post(
         import.meta.env.VITE_API_URL,
-        { contents: formattedHistory },
+        { message: lastMessage },
         { headers: { "Content-Type": "application/json" } }
       );
 
-      // Procesar la respuesta del bot
-      const apiResponseText = data.candidates[0].content.parts[0].text
-        .replace(/\*\*(.*?)\*\*/g, "$1")
-        .trim();
-
+      // Mostrar mensaje principal del bot
+      const apiResponseText = data.message || "No obtuvimos respuesta del bot.";
       updateHistory(apiResponseText);
+
+      // Si hay productos sugeridos, agregarlos al chat
+      if (data.additionalInfo?.products?.length) {
+        data.additionalInfo.products.forEach((product) => {
+          updateHistory(
+            `${product.name} - $${product.price}\n${product.description}`,
+            false,
+            product.image
+          );
+        });
+      }
     } catch (error) {
-      const errorMessage = error.response?.data?.error?.message || error.message || "Algo salió mal!";
+      const errorMessage =
+        error.response?.data?.error?.message || error.message || "Algo salió mal!";
       updateHistory(errorMessage, true);
     }
   };
@@ -60,7 +69,7 @@ const App = () => {
   return (
     <div className={`container ${showChatbot ? "show-chatbot" : ""}`}>
       <button onClick={() => setShowChatbot((prev) => !prev)} id="chatbot-toggler">
-        <span className="material-symbols-rounded"><ChatbotIcon/></span>
+        <span className="material-symbols-rounded"><ChatbotIcon /></span>
         <span className="material-symbols-rounded">Cerrar</span>
       </button>
 
@@ -69,7 +78,7 @@ const App = () => {
         <div className="chat-header">
           <div className="header-info">
             <ChatbotIcon />
-            <h2 className="logo-text">Tortas adrian</h2>
+            <h2 className="logo-text">Tortas Adrián</h2>
           </div>
           <button
             onClick={() => setShowChatbot((prev) => !prev)}
@@ -110,3 +119,4 @@ const App = () => {
 };
 
 export default App;
+
